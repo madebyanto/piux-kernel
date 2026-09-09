@@ -5,7 +5,7 @@ echo "This script speeds up the process of cleaning, compiling, creating images 
 echo "v1.0.0"
 
 DISK="disk.img"
-ISO="build/kernel.iso"
+ISO="piux.iso"
 
 if [ ! -d "build" ]; then
     mkdir -p build

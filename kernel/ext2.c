@@ -102,6 +102,8 @@ int ext2_mount(void) {
     if (fs.group_count == 0) return -1;
     fs.first_data_block = fs.superblock.first_data_block;
     fs.current_dir_inode = 2;
+    fs.current_path[0] = '~';
+    fs.current_path[1] = '\0';
     fs_initialized = 1;
     return 0;
 }
@@ -270,6 +272,71 @@ static int allocate_inode(uint32_t *result) {
 }
 
 int ext2_find_inode(const char *filename) { return ext2_find_inode_in_dir(fs.current_dir_inode, filename); }
+
+int ext2_find_inode_in_dir(uint32_t dir_inode, const char *filename);
+
+static int path_next_component(const char **path, char *component) {
+    uint32_t length = 0;
+    while (**path == '/') (*path)++;
+    if (**path == '\0') return 0;
+    while (**path != '\0' && **path != '/') {
+        if (length >= EXT2_MAX_NAME_LEN) return -1;
+        component[length++] = *(*path)++;
+    }
+    component[length] = '\0';
+    return 1;
+}
+
+int ext2_find_inode_by_path(const char *path) {
+    uint32_t inode = fs.current_dir_inode;
+    char component[EXT2_MAX_NAME_LEN + 1];
+    int component_result;
+    if (!fs_initialized || path == 0 || *path == '\0') return -1;
+    if (path[0] == '/' || (path[0] == '~' && (path[1] == '\0' || path[1] == '/'))) {
+        inode = 2;
+        if (path[0] == '~') path++;
+    }
+    while ((component_result = path_next_component(&path, component)) > 0) {
+        if (component[0] == '.' && component[1] == '\0') continue;
+        if (component[0] == '.' && component[1] == '.' && component[2] == '\0') {
+            int parent = ext2_find_inode_in_dir(inode, "..");
+            if (parent < 0) return -1;
+            inode = (uint32_t)parent;
+        } else {
+            int child = ext2_find_inode_in_dir(inode, component);
+            if (child < 0) return -1;
+            inode = (uint32_t)child;
+        }
+    }
+    if (component_result < 0) return -1;
+    return (int)inode;
+}
+
+static int split_parent_path(const char *path, char *parent_path, char *name) {
+    int length = 0;
+    int last_separator = -1;
+    if (path == 0 || *path == '\0') return -1;
+    while (path[length]) {
+        if (path[length] == '/') last_separator = length;
+        length++;
+    }
+    if (length == 0 || length > 255) return -1;
+    int name_start = last_separator + 1;
+    int name_length_value = length - name_start;
+    if (name_length_value == 0 || name_length_value > EXT2_MAX_NAME_LEN) return -1;
+    for (int i = 0; i < name_length_value; i++) name[i] = path[name_start + i];
+    name[name_length_value] = '\0';
+    if (last_separator < 0) {
+        parent_path[0] = '\0';
+    } else if (last_separator == 0) {
+        parent_path[0] = '/';
+        parent_path[1] = '\0';
+    } else {
+        for (int i = 0; i < last_separator; i++) parent_path[i] = path[i];
+        parent_path[last_separator] = '\0';
+    }
+    return 0;
+}
 
 int ext2_find_inode_in_dir(uint32_t dir_inode, const char *filename) {
     ext2_inode_t inode;
@@ -472,8 +539,100 @@ int ext2_create_file(const char *filename) {
     return (int)inode_num;
 }
 
+int ext2_create_directory(const char *dirname) {
+    ext2_inode_t parent;
+    ext2_inode_t inode;
+    uint32_t inode_num;
+    uint32_t data_block;
+    int length = name_length(dirname);
+    if (!fs_initialized || length == 0 || length > EXT2_MAX_NAME_LEN ||
+        ext2_find_inode(dirname) >= 0 || ext2_read_inode(fs.current_dir_inode, &parent) < 0 ||
+        (parent.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return -1;
+    if (allocate_inode(&inode_num) < 0 || allocate_block(&data_block) < 0) return -1;
+
+    memset_safe(&inode, 0, sizeof(inode));
+    inode.mode = EXT2_S_IFDIR | 0755;
+    inode.links_count = 2;
+    inode.size = fs.block_size;
+    inode.blocks = fs.block_size / 512;
+    inode.block[0] = data_block;
+
+    memset_safe(block_buffer, 0, fs.block_size);
+    ext2_dir_entry_t *self = (ext2_dir_entry_t *)block_buffer;
+    self->inode = inode_num;
+    self->rec_len = 12;
+    self->name_len = 1;
+    self->file_type = EXT2_FT_DIR;
+    self->name[0] = '.';
+
+    ext2_dir_entry_t *parent_entry = (ext2_dir_entry_t *)(block_buffer + 12);
+    parent_entry->inode = fs.current_dir_inode;
+    parent_entry->rec_len = (uint16_t)(fs.block_size - 12);
+    parent_entry->name_len = 2;
+    parent_entry->file_type = EXT2_FT_DIR;
+    parent_entry->name[0] = '.';
+    parent_entry->name[1] = '.';
+
+    if (ext2_write_block(data_block, block_buffer) < 0 ||
+        ext2_write_inode(inode_num, &inode) < 0 ||
+        add_directory_entry(&parent, inode_num, dirname, EXT2_FT_DIR) < 0) return -1;
+    parent.links_count++;
+    if (ext2_write_inode(fs.current_dir_inode, &parent) < 0) return -1;
+    return (int)inode_num;
+}
+
 int ext2_write_file_by_name(const char *filename, const char *buffer, uint32_t size) {
     int inode = ext2_find_inode(filename);
     if (inode < 0) inode = ext2_create_file(filename);
+    return inode < 0 ? -1 : ext2_write_file((uint32_t)inode, buffer, size);
+}
+
+int ext2_read_file_by_path(const char *path, char *buffer, uint32_t size) {
+    int inode = ext2_find_inode_by_path(path);
+    return inode < 0 ? -1 : ext2_read_file((uint32_t)inode, buffer, size);
+}
+
+int ext2_print_dir_by_path(const char *path, void (*vga_puts)(const char*)) {
+    int inode = ext2_find_inode_by_path(path);
+    if (inode < 0) return -1;
+    ext2_print_dir_contents((uint32_t)inode, vga_puts);
+    return 0;
+}
+
+int ext2_create_file_by_path(const char *path) {
+    char parent_path[256];
+    char name[EXT2_MAX_NAME_LEN + 1];
+    uint32_t saved_dir;
+    int parent;
+    int result;
+    if (split_parent_path(path, parent_path, name) < 0) return -1;
+    parent = parent_path[0] == '\0' ? (int)fs.current_dir_inode : ext2_find_inode_by_path(parent_path);
+    if (parent < 0) return -1;
+    saved_dir = fs.current_dir_inode;
+    fs.current_dir_inode = (uint32_t)parent;
+    result = ext2_create_file(name);
+    fs.current_dir_inode = saved_dir;
+    return result;
+}
+
+int ext2_create_directory_by_path(const char *path) {
+    char parent_path[256];
+    char name[EXT2_MAX_NAME_LEN + 1];
+    uint32_t saved_dir;
+    int parent;
+    int result;
+    if (split_parent_path(path, parent_path, name) < 0) return -1;
+    parent = parent_path[0] == '\0' ? (int)fs.current_dir_inode : ext2_find_inode_by_path(parent_path);
+    if (parent < 0) return -1;
+    saved_dir = fs.current_dir_inode;
+    fs.current_dir_inode = (uint32_t)parent;
+    result = ext2_create_directory(name);
+    fs.current_dir_inode = saved_dir;
+    return result;
+}
+
+int ext2_write_file_by_path(const char *path, const char *buffer, uint32_t size) {
+    int inode = ext2_find_inode_by_path(path);
+    if (inode < 0) inode = ext2_create_file_by_path(path);
     return inode < 0 ? -1 : ext2_write_file((uint32_t)inode, buffer, size);
 }

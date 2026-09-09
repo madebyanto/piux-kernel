@@ -1,17 +1,21 @@
 #include <stdint.h>
 #include "../kernel/io.h"
+#include "../kernel/ext2.h"
 
 typedef void (*vga_puts_t)(const char*);
 typedef void (*vga_putc_t)(char);
 
-extern char keyboard_read_char(void);
+extern int ext2_find_inode_by_path(const char *path);
+extern int ext2_read_file_by_path(const char *path, char *buffer, uint32_t size);
+extern int ext2_write_file_by_path(const char *path, const char *buffer, uint32_t size);
+extern int keyboard_read_char(void);
 extern int ramfs_write_file(const char *filename, const char *data, uint32_t size);
 extern int ramfs_find_file(const char *filename);
 extern int ramfs_create_file(const char *filename);
 extern int ramfs_read_file(const char *filename, char *buffer, uint32_t max_size);
 
 #define BUFFER_SIZE 8191
-#define MAX_FILENAME_LEN 64
+#define MAX_FILENAME_LEN 256
 
 void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
     if (*filename == '\0') {
@@ -40,9 +44,11 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
     int pos = 0;
     int running = 1;
     
-    int idx = ramfs_find_file(safe_filename);
+    int use_ext2 = ext2_is_mounted();
+    int idx = use_ext2 ? ext2_find_inode_by_path(safe_filename) : ramfs_find_file(safe_filename);
     if (idx >= 0) {
-        int loaded = ramfs_read_file(safe_filename, buffer, BUFFER_SIZE);
+        int loaded = use_ext2 ? ext2_read_file_by_path(safe_filename, buffer, BUFFER_SIZE) :
+                                ramfs_read_file(safe_filename, buffer, BUFFER_SIZE);
         if (loaded > 0) {
             pos = loaded;
             for (int i = 0; i < pos; i++) {
@@ -61,18 +67,20 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
         
         if (c == 19) {
             vga_puts("\n[Saving] ");
-            
-            idx = ramfs_find_file(safe_filename);
-            if (idx < 0) {
-                int created = ramfs_create_file(safe_filename);
-                if (created < 0) {
+
+            int written;
+            if (use_ext2) {
+                written = ext2_write_file_by_path(safe_filename, buffer, (uint32_t)pos);
+            } else {
+                idx = ramfs_find_file(safe_filename);
+                if (idx < 0 && ramfs_create_file(safe_filename) < 0) {
                     vga_puts("CREATE_FAILED\n");
                     continue;
                 }
+                written = ramfs_write_file(safe_filename, buffer, (uint32_t)pos);
             }
-            
-            int written = ramfs_write_file(safe_filename, buffer, (uint32_t)pos);
-            if (written > 0) {
+
+            if (written >= 0) {
                 vga_puts("OK\n");
             } else {
                 vga_puts("FAILED\n");

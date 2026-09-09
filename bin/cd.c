@@ -6,12 +6,14 @@ typedef void (*vga_puts_t)(const char*);
 extern ext2_filesystem_t fs;
 
 void cmd_cd(const char *dirname, vga_puts_t vga_puts, void (*vga_putc)(char)) {
+    int inode;
+    int path_length;
     if (*dirname == '\0') {
         vga_puts("Usage: cd <dirname>\n");
         return;
     }
-    
-    int inode = ext2_find_inode_in_dir(fs.current_dir_inode, dirname);
+
+    inode = ext2_find_inode_by_path(dirname);
     
     if (inode < 0) {
         vga_puts("Directory not found\n");
@@ -29,6 +31,31 @@ void cmd_cd(const char *dirname, vga_puts_t vga_puts, void (*vga_putc)(char)) {
         return;
     }
     
-    fs.current_dir_inode = inode;
+    fs.current_dir_inode = (uint32_t)inode;
+    if (dirname[0] == '~') {
+        for (path_length = 0; dirname[path_length] && path_length < 255; path_length++) {
+            fs.current_path[path_length] = dirname[path_length];
+        }
+        fs.current_path[path_length] = '\0';
+    } else if (dirname[0] == '/') {
+        fs.current_path[0] = '~';
+        for (path_length = 0; dirname[path_length] && path_length < 254; path_length++) {
+            fs.current_path[path_length + 1] = dirname[path_length];
+        }
+        fs.current_path[path_length + 1] = '\0';
+    } else if (dirname[0] == '.' && dirname[1] == '.' && dirname[2] == '\0') {
+        path_length = 0;
+        while (fs.current_path[path_length]) path_length++;
+        while (path_length > 1 && fs.current_path[path_length - 1] != '/') path_length--;
+        if (path_length > 1) fs.current_path[path_length - 1] = '\0';
+    } else {
+        path_length = 0;
+        while (fs.current_path[path_length]) path_length++;
+        if (path_length < 255) fs.current_path[path_length++] = '/';
+        for (int i = 0; dirname[i] && path_length < 255; i++) {
+            fs.current_path[path_length++] = dirname[i];
+        }
+        fs.current_path[path_length] = '\0';
+    }
     vga_puts("Changed directory\n");
 }

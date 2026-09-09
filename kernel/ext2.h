@@ -114,6 +114,7 @@ typedef struct {
     uint32_t current_dir_inode;
     uint32_t group_count;
     uint32_t first_data_block;
+    char current_path[256];
 } ext2_filesystem_t;
 
 int ext2_mount(void);
@@ -123,11 +124,18 @@ int ext2_write_block(uint32_t block_num, uint8_t *buffer);
 int ext2_read_inode(uint32_t inode_num, ext2_inode_t *inode);
 int ext2_find_inode(const char *filename);
 int ext2_find_inode_in_dir(uint32_t dir_inode, const char *filename);
+int ext2_find_inode_by_path(const char *path);
 int ext2_read_file(uint32_t inode_num, char *buffer, uint32_t size);
 int ext2_read_file_by_name(const char *filename, char *buffer, uint32_t size);
+int ext2_read_file_by_path(const char *path, char *buffer, uint32_t size);
 void ext2_print_dir_contents(uint32_t dir_inode, void (*vga_puts)(const char*));
+int ext2_print_dir_by_path(const char *path, void (*vga_puts)(const char*));
 int ext2_create_file(const char *filename);
+int ext2_create_file_by_path(const char *path);
+int ext2_create_directory(const char *dirname);
+int ext2_create_directory_by_path(const char *path);
 int ext2_write_file(uint32_t inode_num, const char *buffer, uint32_t size);
 int ext2_write_file_by_name(const char *filename, const char *buffer, uint32_t size);
+int ext2_write_file_by_path(const char *path, const char *buffer, uint32_t size);
 
 #endif

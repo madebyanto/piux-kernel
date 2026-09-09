@@ -13,7 +13,7 @@ void cmd_cat(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
     }
     
     char buffer[8192];
-    int bytes = ext2_is_mounted() ? ext2_read_file_by_name(filename, buffer, 8192) :
+    int bytes = ext2_is_mounted() ? ext2_read_file_by_path(filename, buffer, 8192) :
                                     ramfs_read_file(filename, buffer, 8192);
     
     if (bytes < 0) {

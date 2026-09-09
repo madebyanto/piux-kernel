@@ -16,8 +16,11 @@ extern void cmd_cat(const char *param, void (*vga_puts)(const char*), void (*vga
 extern void cmd_clean(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
 extern void cmd_fs(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
 extern void cmd_touch(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_mkdir(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
 extern void cmd_nano(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
 extern void cmd_echo(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_shutdown(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_reboot(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
 
 static command_t commands[] = {
     { "help", cmd_help },
@@ -28,8 +31,11 @@ static command_t commands[] = {
     { "clear", cmd_clean },
     { "fs", cmd_fs },
     { "touch", cmd_touch },
+    { "mkdir", cmd_mkdir },
     { "nano", cmd_nano },
     { "echo", cmd_echo },
+    { "shutdown", cmd_shutdown },
+    { "reboot", cmd_reboot },
     { 0, 0 }
 };
 

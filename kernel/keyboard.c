@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "io.h"
+#include "keyboard.h"
 
 static const char scancode_ascii[] = {
     0,      27,     '1',    '2',    '3',    '4',    '5',    '6',    '7',    '8',    '9',    '0',    '-',    '=',    '\b',
@@ -21,8 +22,9 @@ static int shift_pressed = 0;
 static int ctrl_pressed = 0;
 static int alt_pressed = 0;
 static uint8_t last_scancode = 0;
+static int extended_scancode = 0;
 
-char keyboard_read_char(void) {
+int keyboard_read_char(void) {
     while (1) {
         if (!(inb(0x64) & 1)) {
             continue;
@@ -30,6 +32,22 @@ char keyboard_read_char(void) {
         
         uint8_t scancode = inb(0x60);
         last_scancode = scancode;
+
+        if (scancode == 0xE0) {
+            extended_scancode = 1;
+            continue;
+        }
+
+        if (extended_scancode) {
+            extended_scancode = 0;
+            if (scancode & 0x80) continue;
+            if (scancode == 0x48) return KEY_ARROW_UP;
+            if (scancode == 0x50) return KEY_ARROW_DOWN;
+            if (scancode == 0x4B) return KEY_ARROW_LEFT;
+            if (scancode == 0x4D) return KEY_ARROW_RIGHT;
+            if (scancode == 0x53) return KEY_DELETE;
+            continue;
+        }
         
         if (scancode & 0x80) {
             uint8_t released = scancode & ~0x80;
