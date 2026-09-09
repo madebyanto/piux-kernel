@@ -1,0 +1,36 @@
+#ifndef COMMANDS_H
+#define COMMANDS_H
+
+typedef void (*cmd_handler_t)(const char*, void (*)(const char*), void (*)(char));
+
+typedef struct {
+    const char *name;
+    cmd_handler_t handler;
+} command_t;
+
+extern void cmd_help(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_about(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_ls(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_cd(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_cat(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_clean(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_fs(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_touch(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_nano(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+extern void cmd_echo(const char *param, void (*vga_puts)(const char*), void (*vga_putc)(char));
+
+static command_t commands[] = {
+    { "help", cmd_help },
+    { "about", cmd_about },
+    { "ls", cmd_ls },
+    { "cd", cmd_cd },
+    { "cat", cmd_cat },
+    { "clear", cmd_clean },
+    { "fs", cmd_fs },
+    { "touch", cmd_touch },
+    { "nano", cmd_nano },
+    { "echo", cmd_echo },
+    { 0, 0 }
+};
+
+#endif

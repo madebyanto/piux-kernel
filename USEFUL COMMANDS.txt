@@ -1,0 +1,4 @@
+dd if=/dev/zero of=disk.img bs=1M count=100
+mke2fs disk.img
+
+qemu-system-i386 -cdrom build/kernel.iso -hda disk.img
