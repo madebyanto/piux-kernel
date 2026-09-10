@@ -1,0 +1,111 @@
+.
+├── bin
+│   ├── about.c
+│   ├── cat.c
+│   ├── cd.c
+│   ├── clear.c
+│   ├── commands.h
+│   ├── echo.c
+│   ├── fs.c
+│   ├── help.c
+│   ├── ls.c
+│   ├── mkdir.c
+│   ├── nano.c
+│   ├── pwm.c
+│   ├── reboot.c
+│   ├── shutdown.c
+│   └── touch.c
+├── boot
+│   └── bootx.asm
+├── build
+│   ├── bin
+│   │   ├── about.o
+│   │   ├── cat.o
+│   │   ├── cd.o
+│   │   ├── clear.o
+│   │   ├── echo.o
+│   │   ├── fs.o
+│   │   ├── help.o
+│   │   ├── ls.o
+│   │   ├── mkdir.o
+│   │   ├── nano.o
+│   │   ├── pwm.o
+│   │   ├── reboot.o
+│   │   ├── shutdown.o
+│   │   └── touch.o
+│   ├── bootx.o
+│   ├── isodir
+│   │   └── boot
+│   │       ├── grub
+│   │       │   └── grub.cfg
+│   │       └── kernel.elf
+│   ├── kernel
+│   │   ├── ata.o
+│   │   ├── auth.o
+│   │   ├── ext2.o
+│   │   ├── keyboard.o
+│   │   ├── kmain.o
+│   │   ├── mouse.o
+│   │   └── ramfs.o
+│   ├── kernel.elf
+│   ├── logo-24x24
+│   │   └── piux.o
+│   ├── logo-48x48
+│   │   └── piux.o
+│   ├── logo-96x96
+│   │   └── piux.o
+│   ├── os-infos.o
+│   ├── pwm-info.o
+│   └── tui
+│       ├── installer
+│       │   └── installer.o
+│       └── wm
+│           └── wm.o
+├── disk.img
+├── docs
+│   └── PWM-COMMANDS.md
+├── etc
+│   ├── os-infos
+│   └── pwm-info
+├── fast-all.sh
+├── grub.cfg
+├── kernel
+│   ├── ata.c
+│   ├── ata.h
+│   ├── auth.c
+│   ├── auth.h
+│   ├── ext2.c
+│   ├── ext2.h
+│   ├── io.h
+│   ├── kernel_entry.asm
+│   ├── keyboard.c
+│   ├── keyboard.h
+│   ├── kmain.c
+│   ├── logo
+│   │   ├── ascii
+│   │   │   ├── 24x24
+│   │   │   │   └── piux
+│   │   │   ├── 48x48
+│   │   │   │   └── piux
+│   │   │   └── 96x96
+│   │   │       └── piux
+│   │   └── piux.png
+│   ├── mouse.c
+│   ├── mouse.h
+│   ├── ramfs.c
+│   └── ramfs.h
+├── LICENSE
+├── linker.ld
+├── Makefile
+├── piux.iso
+├── piux.png
+├── README.md
+├── TREE.txt
+├── tui
+│   ├── installer
+│   │   ├── installer.c
+│   │   └── installer.h
+│   └── wm
+│       ├── wm.c
+│       └── wm.h
+└── USEFUL COMMANDS.txt

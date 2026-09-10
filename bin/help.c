@@ -14,6 +14,7 @@ void cmd_help(const char *param, vga_puts_t vga_puts, void (*vga_putc)(char)) {
     vga_puts("  touch  - Create new file\n");
     vga_puts("  mkdir  - Create directory\n");
     vga_puts("  nano   - Edit file\n");
+    vga_puts("  pwm    - Control the pWM window manager (also: pmw)\n");
     vga_puts("  echo   - Print arguments\n");
     vga_puts("  shutdown - Shutdown in 60 seconds, or use 'shutdown now'\n");
     vga_puts("  reboot - Reboot immediately\n");

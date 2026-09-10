@@ -14,6 +14,10 @@ A small 32-bit x86 kernel bootable with GRUB Multiboot1. It is built with NASM, 
 - **Built-in commands** - Commands are compiled into the kernel from `bin/`
 - **ATA PIO disk driver** - Primary IDE channel access
 - **Ext2 filesystem** - Mounting, directory traversal, file reading, file creation, and file writing
+- **First-boot installer TUI** - Unix root tree, disk target, users, and sudo configuration
+- **User authentication** - SHA-256 password hashes, login, and sudoer checks
+- **pWM text window manager** - Tiled terminal windows with keyboard focus
+- **PS/2 mouse driver** - Pointer focus, clicks, and wheel scrolling in pWM
 - **Configuration file** - Kernel metadata embedded from `etc/os-infos`
 
 ## Prerequisites
@@ -105,6 +109,7 @@ piux>
 - **echo** - Print text, with quoted argument support
 - **fs** - Check and mount the ext2 filesystem
 - **clear** - Clear the VGA screen
+- **pwm/pmw** - Start, stop, inspect, or reload the pWM window manager
 
 Type any command and press Enter. Use Backspace to correct typos.
 
@@ -136,6 +141,32 @@ make build/ext2.img
 
 The filesystem is intentionally non-journaled. The current writer does not implement deletion, rename, truncate with block freeing, or triple-indirect file growth.
 
+## First-Boot Installer
+
+When an Ext2 disk has no `.piux-first-boot` marker, Piux opens a keyboard-driven TUI. The installer can:
+
+- create standard Unix directories such as `/bin`, `/etc`, `/home`, `/usr`, and `/var`;
+- save root device and filesystem settings in `/.config/system.conf` and `/.config/disk.conf`;
+- create home directories and list users in `/.config/users`;
+- configure the initial sudo policy in `/.config/sudoers` and `/.config/sudo-user`.
+- save account records as `username:sha256:sudo-flag` in `/.config/passwd` and request login before the shell;
+- show the authenticated username in the shell prompt and reject `sudo command` for non-sudoers.
+
+The installer records the mounted Ext2 device (`/dev/hda`) in `/.config/disk.conf`. Partitioning is not implemented yet because the kernel does not have a partition table writer.
+
+The installer runs as a fixed sequence: filesystem setup, user and password creation, sudoer selection, then reboot. Passwords are never stored in plaintext. Administrative command handlers are not yet present; pWM only enforces the sudoer gate for the future `sudo` command path.
+
+## pWM
+
+After login, Piux starts `pWM`, a text window manager inspired by tiled compositors. A terminal is opened by default. Each terminal is rendered as a tiled window in the 80x25 VGA surface.
+
+- `Ctrl+Q` opens another terminal, up to four tiled windows;
+- `Ctrl+C` closes the focused terminal;
+- `Ctrl+Left` and `Ctrl+Right` move focus between terminals;
+- move the mouse over a terminal and click to focus it;
+- use the mouse wheel over a terminal to scroll its output;
+- command handlers remain the same as the shell and are not modified by pWM.
+
 ## Architecture
 
 ### Boot Flow
@@ -147,7 +178,8 @@ The filesystem is intentionally non-journaled. The current writer does not imple
    - `eax = 0x1badb002` (Multiboot magic)
    - `ebx = address of multiboot info structure`
 5. **bootx.asm** initializes stack, jumps to `kernel_main()`
-6. **kmain.c** initializes RAMFS, attempts to mount ext2, and starts the shell
+6. **kmain.c** initializes RAMFS, mounts ext2, and opens the first-boot installer when needed
+7. **tui/installer/** creates the Unix root tree and stores installer settings in `/.config/`
 
 ### Memory Layout
 

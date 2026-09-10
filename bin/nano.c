@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "../kernel/io.h"
 #include "../kernel/ext2.h"
+#include "../tui/wm/wm.h"
 
 typedef void (*vga_puts_t)(const char*);
 typedef void (*vga_putc_t)(char);
@@ -16,6 +17,16 @@ extern int ramfs_read_file(const char *filename, char *buffer, uint32_t max_size
 
 #define BUFFER_SIZE 8191
 #define MAX_FILENAME_LEN 256
+
+static void redraw_editor(vga_puts_t vga_puts, vga_putc_t vga_putc,
+                          const char *filename, const char *buffer, int length) {
+    if (!pwm_command_is_active()) return;
+    pwm_command_clear();
+    vga_puts("=== nano: ");
+    vga_puts(filename);
+    vga_puts(" ===\nCTRL+S save | CTRL+X exit | BACKSPACE delete\n---\n");
+    for (int i = 0; i < length; i++) vga_putc(buffer[i]);
+}
 
 void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
     if (*filename == '\0') {
@@ -34,11 +45,6 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
         safe_filename[i] = filename[i];
     }
     
-    vga_puts("=== nano: ");
-    vga_puts(safe_filename);
-    vga_puts(" ===\n");
-    vga_puts("CTRL+S save | CTRL+X exit | BACKSPACE delete\n---\n");
-    
     char buffer[BUFFER_SIZE + 1];
     memset_safe(buffer, 0, sizeof(buffer));
     int pos = 0;
@@ -51,19 +57,19 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
                                 ramfs_read_file(safe_filename, buffer, BUFFER_SIZE);
         if (loaded > 0) {
             pos = loaded;
-            for (int i = 0; i < pos; i++) {
-                vga_putc(buffer[i]);
-            }
-            vga_puts("\n[Loaded]\n");
-        } else {
-            vga_puts("[New file]\n");
         }
-    } else {
-        vga_puts("[New file]\n");
+    }
+    if (pwm_command_is_active()) redraw_editor(vga_puts, vga_putc, safe_filename, buffer, pos);
+    else {
+        vga_puts("=== nano: ");
+        vga_puts(safe_filename);
+        vga_puts(" ===\nCTRL+S save | CTRL+X exit | BACKSPACE delete\n---\n");
+        for (int i = 0; i < pos; i++) vga_putc(buffer[i]);
+        vga_puts(pos ? "\n[Loaded]\n" : "[New file]\n");
     }
     
     while (running) {
-        char c = keyboard_read_char();
+        char c = (char)pwm_command_read_char();
         
         if (c == 19) {
             vga_puts("\n[Saving] ");
@@ -85,6 +91,7 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
             } else {
                 vga_puts("FAILED\n");
             }
+            if (pwm_command_is_active()) redraw_editor(vga_puts, vga_putc, safe_filename, buffer, pos);
             continue;
         }
         
@@ -98,7 +105,8 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
             if (pos > 0) {
                 pos--;
                 buffer[pos] = '\0';
-                vga_puts("\b \b");
+                if (pwm_command_is_active()) redraw_editor(vga_puts, vga_putc, safe_filename, buffer, pos);
+                else vga_puts("\b \b");
             }
             continue;
         }
@@ -106,14 +114,16 @@ void cmd_nano(const char *filename, vga_puts_t vga_puts, vga_putc_t vga_putc) {
         if ((c == '\n' || c == '\r') && pos < BUFFER_SIZE) {
             buffer[pos++] = '\n';
             buffer[pos] = '\0';
-            vga_putc('\n');
+            if (pwm_command_is_active()) redraw_editor(vga_puts, vga_putc, safe_filename, buffer, pos);
+            else vga_putc('\n');
             continue;
         }
         
         if (c >= 32 && c < 127 && pos < BUFFER_SIZE) {
             buffer[pos++] = c;
             buffer[pos] = '\0';
-            vga_putc(c);
+            if (pwm_command_is_active()) redraw_editor(vga_puts, vga_putc, safe_filename, buffer, pos);
+            else vga_putc(c);
         }
     }
 }

@@ -2,7 +2,10 @@
 #include "io.h"
 #include "keyboard.h"
 #include "ext2.h"
+#include "auth.h"
 #include "../bin/commands.h"
+#include "../tui/installer/installer.h"
+#include "../tui/wm/wm.h"
 
 #define VGA_MEMORY 0xB8000
 #define VGA_WIDTH 80
@@ -22,6 +25,24 @@ static void vga_update_cursor(void) {
 
 extern ext2_filesystem_t fs;
 extern int ramfs_init(void);
+
+static void power_off(void) {
+    outw(0x604, 0x2000);
+    outw(0xB004, 0x2000);
+
+    for (;;) {
+        asm volatile ("cli; hlt");
+    }
+}
+
+static void reboot_system(void) {
+    while (inb(0x64) & 0x02) {
+    }
+    outb(0x64, 0xFE);
+    for (;;) {
+        asm volatile ("cli; hlt");
+    }
+}
 
 void vga_scroll(void) {
     for (int i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++) {
@@ -138,6 +159,53 @@ void strcpy(char *dest, const char *src) {
     dest[i] = '\0';
 }
 
+static void draw_boot_menu(int selected) {
+    vga_clear();
+    vga_puts("Piux first boot\n\n");
+    vga_puts("Use the arrow keys to choose an option.\n\n");
+    vga_puts(selected == 0 ? "> Install the system (TUI)\n" : "  Install the system (TUI)\n");
+    vga_puts(selected == 1 ? "> Shell-only\n" : "  Shell-only\n");
+    vga_puts(selected == 2 ? "> Shutdown\n" : "  Shutdown\n");
+}
+
+static int mark_first_boot_complete(void) {
+    if (ext2_create_file(".piux-first-boot") < 0) return -1;
+    return ext2_write_file_by_name(".piux-first-boot", "1", 1);
+}
+
+static int first_boot_menu(void) {
+    int selected = 0;
+
+    if (!ext2_is_mounted() || ext2_find_inode(".piux-first-boot") >= 0) return 0;
+
+    draw_boot_menu(selected);
+    while (1) {
+        int key = keyboard_read_char();
+
+        if (key == KEY_ARROW_UP && selected > 0) {
+            selected--;
+            draw_boot_menu(selected);
+        } else if (key == KEY_ARROW_DOWN && selected < 2) {
+            selected++;
+            draw_boot_menu(selected);
+        } else if (key == '\n') {
+            if (selected == 0) {
+                if (installer_run(vga_clear, vga_puts, vga_putc, power_off, reboot_system) == 1) {
+                    mark_first_boot_complete();
+                    return 1;
+                }
+            }
+            if (selected == 1) {
+                mark_first_boot_complete();
+                return 1;
+            }
+            vga_clear();
+            vga_puts("Shutting down...\n");
+            power_off();
+        }
+    }
+}
+
 static void redraw_input_line(char *buffer, int length, int cursor, int old_length, int old_cursor) {
     int i;
     int drawn_length = length > old_length ? length : old_length;
@@ -167,7 +235,8 @@ void shell(void) {
     int length;
     
     while (1) {
-        vga_puts("piux");
+        if (auth_current_username()[0]) vga_puts(auth_current_username());
+        else vga_puts("piux");
         if (ext2_is_mounted()) {
             vga_puts(" ");
             vga_puts(fs.current_path);
@@ -246,6 +315,16 @@ void shell(void) {
             continue;
         }
 
+        if (length > 5 && buffer[0] == 's' && buffer[1] == 'u' && buffer[2] == 'd' &&
+            buffer[3] == 'o' && buffer[4] == ' ') {
+            if (!auth_current_user_is_sudoer()) {
+                vga_puts("Permission denied: user is not a sudoer.\n");
+                continue;
+            }
+            for (int i = 0; i <= length - 5; i++) buffer[i] = buffer[i + 5];
+            length -= 5;
+        }
+
         if (history_count < 16) {
             strcpy(history[history_count++], buffer);
         } else {
@@ -280,7 +359,7 @@ void shell(void) {
         }
         
         command_t *cmd = find_command(cmd_name);
-        
+
         if (cmd) {
             cmd->handler(param, vga_puts, vga_putc);
         } else {
@@ -292,13 +371,23 @@ void shell(void) {
 }
 
 void kernel_main(uint32_t magic, uint32_t addr) {
+    (void)magic;
+    (void)addr;
     vga_clear();
     vga_update_cursor();
-    vga_puts("Welcome to Piux!\n");
-    vga_puts("Type 'help' for essential commands explaination use.\n\n");
-    
+
     ramfs_init();
     ext2_mount();
+
+    if (!first_boot_menu()) {
+        vga_puts("Welcome to Piux!\n");
+        vga_puts("Type 'help' for essential commands explaination use.\n\n");
+    }
+
+    if (ext2_find_inode_by_path("/.config/passwd") >= 0) {
+        auth_login(vga_clear, vga_puts, vga_putc);
+    }
     
+    pwm_run(vga_clear, vga_puts, vga_putc);
     shell();
 }

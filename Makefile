@@ -13,14 +13,17 @@ BUILD_DIR := build
 KERNEL    := $(BUILD_DIR)/kernel.elf
 ISO       := piux.iso
 DISK      := $(BUILD_DIR)/ext2.img
+PWM_INFO  := $(BUILD_DIR)/pwm-info.o
 
 KERNEL_OBJS := $(patsubst kernel/%.c,$(BUILD_DIR)/kernel/%.o,$(wildcard kernel/*.c))
 BIN_OBJS    := $(patsubst bin/%.c,$(BUILD_DIR)/bin/%.o,$(wildcard bin/*.c))
+TUI_OBJS    := $(patsubst tui/installer/%.c,$(BUILD_DIR)/tui/installer/%.o,$(wildcard tui/installer/*.c))
+WM_OBJS     := $(patsubst tui/wm/%.c,$(BUILD_DIR)/tui/wm/%.o,$(wildcard tui/wm/*.c))
 
 LOGOS      := $(wildcard kernel/logo/ascii/*/*)
 LOGO_OBJS  := $(patsubst kernel/logo/ascii/%,$(BUILD_DIR)/logo-%.o,$(LOGOS))
 
-OBJECTS := $(BUILD_DIR)/bootx.o $(KERNEL_OBJS) $(BIN_OBJS) $(LOGO_OBJS) $(BUILD_DIR)/os-infos.o
+OBJECTS := $(BUILD_DIR)/bootx.o $(KERNEL_OBJS) $(BIN_OBJS) $(TUI_OBJS) $(WM_OBJS) $(LOGO_OBJS) $(BUILD_DIR)/os-infos.o $(PWM_INFO)
 
 all: $(ISO)
 
@@ -36,10 +39,23 @@ $(BUILD_DIR)/bin/%.o: bin/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -I kernel -I bin -c -o $@ $<
 
+$(BUILD_DIR)/tui/installer/%.o: tui/installer/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I kernel -I bin -I tui/installer -c -o $@ $<
+
+$(BUILD_DIR)/tui/wm/%.o: tui/wm/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I kernel -I bin -I tui/wm -c -o $@ $<
+
 $(BUILD_DIR)/os-infos.o: etc/os-infos
 	@mkdir -p $(dir $@)
 	$(OBJCOPY) -I binary -O elf32-i386 -B i386 \
 	  --rename-section .data=.os_infos $< $@
+
+$(PWM_INFO): etc/pwm-info
+	@mkdir -p $(dir $@)
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 \
+	  --rename-section .data=.pwm_info,alloc,load,readonly,data,contents $< $@
 
 $(BUILD_DIR)/logo-%.o: kernel/logo/ascii/%
 	@mkdir -p $(dir $@)

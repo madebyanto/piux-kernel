@@ -24,29 +24,26 @@ static int alt_pressed = 0;
 static uint8_t last_scancode = 0;
 static int extended_scancode = 0;
 
-int keyboard_read_char(void) {
-    while (1) {
-        if (!(inb(0x64) & 1)) {
-            continue;
-        }
-        
+int keyboard_try_read_char(void) {
+    if (!(inb(0x64) & 1) || (inb(0x64) & 0x20)) return -1;
+    {
         uint8_t scancode = inb(0x60);
         last_scancode = scancode;
 
         if (scancode == 0xE0) {
             extended_scancode = 1;
-            continue;
+            return -1;
         }
 
         if (extended_scancode) {
             extended_scancode = 0;
-            if (scancode & 0x80) continue;
+            if (scancode & 0x80) return -1;
             if (scancode == 0x48) return KEY_ARROW_UP;
             if (scancode == 0x50) return KEY_ARROW_DOWN;
             if (scancode == 0x4B) return KEY_ARROW_LEFT;
             if (scancode == 0x4D) return KEY_ARROW_RIGHT;
             if (scancode == 0x53) return KEY_DELETE;
-            continue;
+            return -1;
         }
         
         if (scancode & 0x80) {
@@ -54,38 +51,40 @@ int keyboard_read_char(void) {
             
             if (released == 0x2A || released == 0x36) {
                 shift_pressed = 0;
-                continue;
+                return -1;
             }
             
             if (released == 0x1D) {
                 ctrl_pressed = 0;
-                continue;
+                return -1;
             }
             
             if (released == 0x38) {
                 alt_pressed = 0;
-                continue;
+                return -1;
             }
             
-            continue;
+            return -1;
         }
         
         if (scancode == 0x2A || scancode == 0x36) {
             shift_pressed = 1;
-            continue;
+            return -1;
         }
         
         if (scancode == 0x1D) {
             ctrl_pressed = 1;
-            continue;
+            return -1;
         }
         
         if (scancode == 0x38) {
             alt_pressed = 1;
-            continue;
+            return -1;
         }
         
         if (ctrl_pressed) {
+            if (scancode == 0x10) return 17;
+            if (scancode == 0x2E) return 3;
             if (scancode == 0x1F) return 19;
             if (scancode == 0x2D) return 24;
             if (scancode == 0x1E) return 1;
@@ -103,6 +102,14 @@ int keyboard_read_char(void) {
             }
         }
     }
+    return -1;
+}
+
+int keyboard_read_char(void) {
+    int character;
+    while ((character = keyboard_try_read_char()) < 0) {
+    }
+    return character;
 }
 
 int keyboard_is_shift_pressed(void) {

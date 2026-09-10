@@ -1,15 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cd "$SCRIPT_DIR"
 
 echo "Piux Build & Boot Script"
 echo "This script speeds up the process of cleaning, compiling, creating images and starting Piux in VM"
 echo "v1.0.0"
 
-DISK="disk.img"
+DISK="build/ext2.img"
 ISO="piux.iso"
 
-if [ ! -d "build" ]; then
-    mkdir -p build
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "[!] Missing required command: $1"
+        echo "    Install the Piux prerequisites from README.md, then run this script again."
+        exit 1
+    fi
+}
+
+require_command make
+
+if [[ -n "${PIUX_QEMU_DISPLAY:-}" ]]; then
+    QEMU_DISPLAY=("-display" "$PIUX_QEMU_DISPLAY")
+elif [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
+    QEMU_DISPLAY=("-display" "gtk")
+else
+    QEMU_DISPLAY=("-display" "curses")
 fi
+
+build_piux() {
+    echo "[*] Cleaning..."
+    make clean
+    echo "[*] Compiling..."
+    make
+}
+
+create_disk() {
+    echo "[*] Creating disk image..."
+    make "$DISK"
+}
+
+start_vm() {
+    require_command qemu-system-i386
+    echo "[*] Starting VM..."
+    qemu-system-i386 \
+        -cdrom "$ISO" \
+        -drive "file=$DISK,format=raw,if=ide" \
+        -m 512M \
+        -vga std \
+        "${QEMU_DISPLAY[@]}"
+}
 
 while true; do
     echo ""
@@ -19,34 +61,27 @@ while true; do
     echo "  3) Compile from scratch and start from VM disk"
     echo "  4) Exit"
     echo -n "> "
-    read -r choice
+    if ! read -r choice; then
+        echo ""
+        echo "Bye!"
+        exit 0
+    fi
 
     case "$choice" in
         1)
-            echo "[*] Cleaning..."
-            make clean
-            echo "[*] Compiling..."
-            make
+            build_piux
             ;;
         2)
             if [ ! -f "$DISK" ] || [ ! -f "$ISO" ]; then
-                echo "[!] Missing $DISK or $ISO. Compile first."
+                echo "[!] Missing $DISK or $ISO. Build Piux first with option 3."
                 continue
             fi
-            qemu-system-i386 -cdrom "$ISO" -hda "$DISK"
+            start_vm
             ;;
         3)
-            echo "[*] Cleaning..."
-            make clean
-            echo "[*] Compiling..."
-            make
-
-            echo "[*] Creating disk image..."
-            dd if=/dev/zero of="$DISK" bs=1M count=100
-            mke2fs "$DISK"
-
-            echo "[*] Starting VM..."
-            qemu-system-i386 -cdrom "$ISO" -hda "$DISK"
+            build_piux
+            create_disk
+            start_vm
             ;;
         4)
             echo "Bye!"
