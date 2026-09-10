@@ -11,8 +11,8 @@ typedef struct { const char *name; pwm_command_handler_t handler; } command_t;
 
 #define PWM_MAX_WINDOWS 4
 #define PWM_MAX_LINES 32
-#define PWM_MAX_LINE_LENGTH 80
-#define PWM_MAX_INPUT 80
+#define PWM_MAX_LINE_LENGTH 160
+#define PWM_MAX_INPUT 160
 #define PWM_MAX_HISTORY 16
 static int active_window;
 static int window_count;

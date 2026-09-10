@@ -14,54 +14,10 @@
 │   ├── pwm.c
 │   ├── reboot.c
 │   ├── shutdown.c
+│   ├── top.c
 │   └── touch.c
 ├── boot
 │   └── bootx.asm
-├── build
-│   ├── bin
-│   │   ├── about.o
-│   │   ├── cat.o
-│   │   ├── cd.o
-│   │   ├── clear.o
-│   │   ├── echo.o
-│   │   ├── fs.o
-│   │   ├── help.o
-│   │   ├── ls.o
-│   │   ├── mkdir.o
-│   │   ├── nano.o
-│   │   ├── pwm.o
-│   │   ├── reboot.o
-│   │   ├── shutdown.o
-│   │   └── touch.o
-│   ├── bootx.o
-│   ├── isodir
-│   │   └── boot
-│   │       ├── grub
-│   │       │   └── grub.cfg
-│   │       └── kernel.elf
-│   ├── kernel
-│   │   ├── ata.o
-│   │   ├── auth.o
-│   │   ├── ext2.o
-│   │   ├── keyboard.o
-│   │   ├── kmain.o
-│   │   ├── mouse.o
-│   │   └── ramfs.o
-│   ├── kernel.elf
-│   ├── logo-24x24
-│   │   └── piux.o
-│   ├── logo-48x48
-│   │   └── piux.o
-│   ├── logo-96x96
-│   │   └── piux.o
-│   ├── os-infos.o
-│   ├── pwm-info.o
-│   └── tui
-│       ├── installer
-│       │   └── installer.o
-│       └── wm
-│           └── wm.o
-├── disk.img
 ├── docs
 │   └── PWM-COMMANDS.md
 ├── etc
@@ -93,11 +49,14 @@
 │   ├── mouse.c
 │   ├── mouse.h
 │   ├── ramfs.c
-│   └── ramfs.h
+│   ├── ramfs.h
+│   ├── system.c
+│   ├── system.h
+│   ├── video.c
+│   └── video.h
 ├── LICENSE
 ├── linker.ld
 ├── Makefile
-├── piux.iso
 ├── piux.png
 ├── README.md
 ├── TREE.txt

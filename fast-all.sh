@@ -28,6 +28,7 @@ elif [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
     QEMU_DISPLAY=("-display" "gtk,zoom-to-fit=off")
 else
     QEMU_DISPLAY=("-display" "curses")
+    echo "[!] No graphical display detected; curses does not show the 1280x720 framebuffer."
 fi
 
 build_piux() {
@@ -44,13 +45,13 @@ create_disk() {
 
 start_vm() {
     require_command qemu-system-i386
-    echo "[*] Starting VM..."
+    echo "[*] Starting VM with a 1280x720x32 framebuffer..."
     qemu-system-i386 \
         -cdrom "$ISO" \
         -drive "file=$DISK,format=raw,if=ide" \
         -m 512M \
         -vga none \
-        -device VGA,xres=640,yres=480 \
+        -device VGA,xres=1280,yres=720 \
         "${QEMU_DISPLAY[@]}"
 }
 

@@ -76,7 +76,7 @@ $(DISK):
 	mke2fs -q -t ext2 -F $@
 
 run: $(ISO) $(DISK)
-	qemu-system-i386 -cdrom $(ISO) -drive file=$(DISK),format=raw,if=ide -m 512M -vga none -device VGA,xres=640,yres=480 -display gtk,zoom-to-fit=off
+	qemu-system-i386 -cdrom $(ISO) -drive file=$(DISK),format=raw,if=ide -m 512M -vga none -device VGA,xres=1280,yres=720 -display gtk,zoom-to-fit=off
 
 debug: $(KERNEL)
 	qemu-system-i386 -cdrom $(ISO) -m 512M -s -S &

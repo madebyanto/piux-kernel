@@ -3,6 +3,7 @@
 #include "keyboard.h"
 #include "installer.h"
 #include "auth.h"
+#include "video.h"
 
 static installer_clear_t clear_screen;
 static installer_puts_t print_text;
@@ -22,19 +23,28 @@ static void print_spaces(int count) {
 static void print_centered(const char *text) {
     int length = 0;
     while (text[length]) length++;
-    print_spaces((80 - length) / 2);
+    int padding = video_columns > length ? (video_columns - length) / 2 : 0;
+    print_spaces(padding);
     print_text(text);
     print_char('\n');
 }
 
 static void draw_box(const char *title, const char **items, int count, int selected) {
+    int item_width = 0;
+    for (int i = 0; i < count; i++) {
+        int length = 0;
+        while (items[i][length]) length++;
+        if (length > item_width) item_width = length;
+    }
+    item_width += 2;
     clear_screen();
     print_text("\n\n");
     print_centered("+--------------------------------------------------+");
     print_centered(title);
     print_centered("+--------------------------------------------------+");
     for (int i = 0; i < count; i++) {
-        print_spaces(14);
+        int padding = video_columns > item_width ? (video_columns - item_width) / 2 : 0;
+        print_spaces(padding);
         print_text(i == selected ? "> " : "  ");
         print_text(items[i]);
         print_char('\n');

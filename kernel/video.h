@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define VIDEO_WIDTH 640
-#define VIDEO_HEIGHT 480
+#define VIDEO_WIDTH 1280
+#define VIDEO_HEIGHT 720
 #define VIDEO_CELL_WIDTH 8
 #define VIDEO_CELL_HEIGHT 16
 #define VIDEO_COLUMNS (VIDEO_WIDTH / VIDEO_CELL_WIDTH)
