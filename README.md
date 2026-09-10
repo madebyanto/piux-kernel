@@ -1,4 +1,4 @@
-# Piux Kernel v0.5 BETA
+# Piux Kernel v0.6 BETA
 
 Run `fast-all.sh` for the optional interactive TUI used to build and run Piux.
 
