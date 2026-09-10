@@ -10,6 +10,7 @@ void cmd_help(const char *param, vga_puts_t vga_puts, void (*vga_putc)(char)) {
     vga_puts("  cd     - Change directory\n");
     vga_puts("  cat    - Read file\n");
     vga_puts("  clear  - Clear screen\n");
+    vga_puts("  top    - Show RAM and disk resources\n");
     vga_puts("  fs     - Show filesystem info\n");
     vga_puts("  touch  - Create new file\n");
     vga_puts("  mkdir  - Create directory\n");

@@ -12,8 +12,6 @@ Each terminal acts like an independent window with its own output, input, scroll
 - Three terminals: one on the left and two on the right
 - Four terminals: 2x2 grid
 
-The VGA display uses 80 columns and 25 rows. The last row is reserved for the pWM status bar.
-
 ## Automatic startup
 
 After login, `kmain.c` starts pWM. A terminal is created automatically when the manager starts.

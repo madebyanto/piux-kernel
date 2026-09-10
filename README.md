@@ -1,4 +1,4 @@
-# Piux Kernel v0.6 BETA
+# Piux Kernel v0.6.5 BETA
 
 Run `fast-all.sh` for the optional interactive TUI used to build and run Piux.
 
@@ -8,7 +8,7 @@ A small 32-bit x86 kernel bootable with GRUB Multiboot1. It is built with NASM, 
 
 - **Multiboot1 compatible** - Boots with GRUB bootloader
 - **i386 32-bit architecture** - x86 real mode to protected mode transition
-- **VGA text output** - 80x25 character display
+- **Framebuffer video output** - native 640x480x32 graphics mode with an 80x30 text grid
 - **PS/2 keyboard input** - Full QWERTY support with shift modifiers
 - **Simple shell interface** - Command-based kernel interaction
 - **Built-in commands** - Commands are compiled into the kernel from `bin/`
@@ -19,6 +19,16 @@ A small 32-bit x86 kernel bootable with GRUB Multiboot1. It is built with NASM, 
 - **pWM text window manager** - Tiled terminal windows with keyboard focus
 - **PS/2 mouse driver** - Pointer focus, clicks, and wheel scrolling in pWM
 - **Configuration file** - Kernel metadata embedded from `etc/os-infos`
+
+## Minimum Requirements
+
+- **RAM:** 16 MiB minimum
+- **Disk:** 8 MiB minimum for a bootable installation and filesystem
+- **CPU:** 32-bit x86/i386 compatible processor
+- **Boot:** BIOS/legacy boot with GRUB Multiboot1 support
+
+The default QEMU configuration uses more resources than the minimum: 512 MiB
+RAM and a 32 MiB ext2 disk image.
 
 ## Prerequisites
 
@@ -71,7 +81,7 @@ make run
 To run the ISO without the ext2 disk:
 
 ```bash
-qemu-system-i386 -cdrom piux.iso -m 512M -vga std
+qemu-system-i386 -cdrom piux.iso -m 512M -vga none -device VGA,xres=640,yres=480
 ```
 
 ### On Real Hardware
@@ -109,6 +119,7 @@ piux>
 - **echo** - Print text, with quoted argument support
 - **fs** - Check and mount the ext2 filesystem
 - **clear** - Clear the VGA screen
+- **top** - Show total, used, and free RAM plus ext2 disk usage
 - **pwm/pmw** - Start, stop, inspect, or reload the pWM window manager
 
 Type any command and press Enter. Use Backspace to correct typos.
@@ -158,7 +169,7 @@ The installer runs as a fixed sequence: filesystem setup, user and password crea
 
 ## pWM
 
-After login, Piux starts `pWM`, a text window manager inspired by tiled compositors. A terminal is opened by default. Each terminal is rendered as a tiled window in the 80x25 VGA surface.
+After login, Piux starts `pWM`, a text window manager inspired by tiled compositors. A terminal is opened by default. Each terminal is rendered as a tiled window using the complete framebuffer surface.
 
 - `Ctrl+Q` opens another terminal, up to four tiled windows;
 - `Ctrl+C` closes the focused terminal;
@@ -166,6 +177,23 @@ After login, Piux starts `pWM`, a text window manager inspired by tiled composit
 - move the mouse over a terminal and click to focus it;
 - use the mouse wheel over a terminal to scroll its output;
 - command handlers remain the same as the shell and are not modified by pWM.
+
+The pWM layout adapts to the actual framebuffer dimensions and supports up to
+four tiled terminals. Its redraw path uses a software double buffer to reduce
+tearing while windows are being updated.
+
+## Recent Video and System Updates
+
+- Replaced the VGA `80x25` text output with a GRUB Multiboot framebuffer target
+    of `640x480`, with runtime support for the framebuffer format supplied by the
+    bootloader.
+- Added a software bitmap font with uppercase and lowercase letters, numbers,
+    punctuation, and printable ASCII symbols.
+- Centered glyphs vertically in their `8x16` cells and made the pWM grid use
+    all available framebuffer columns and rows.
+- Added software double buffering for pWM redraws.
+- Added the `top` resource monitor for RAM total/used/free and ext2 disk
+    total/used/free reporting.
 
 ## Architecture
 
@@ -326,7 +354,7 @@ qemu-system-i386 -cdrom piux.iso -usb -usbdevice keyboard
 - No multitasking or process management
 - No memory management beyond static allocation
 - No network support
-- No graphics mode (VGA text only)
+- No hardware-accelerated graphics; the desktop is a software-rendered framebuffer UI
 - RAMFS-backed `nano`; ext2 editing is not wired into the command yet
 - No shell features (pipes, redirection, variables)
 

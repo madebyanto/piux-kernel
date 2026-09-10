@@ -16,4 +16,4 @@ Commands:
   pwm --start  Start pWM from the minimal shell
   pwm --stop   Stop pWM and return to the minimal shell
 
-v1.0 BETA!
+v1.1 BETA!

@@ -4,24 +4,22 @@
 #include "mouse.h"
 #include "auth.h"
 #include "ext2.h"
+#include "video.h"
 
 typedef void (*pwm_command_handler_t)(const char *, void (*)(const char *), void (*)(char));
 typedef struct { const char *name; pwm_command_handler_t handler; } command_t;
 
-#define VGA_MEMORY 0xB8000
 #define PWM_MAX_WINDOWS 4
 #define PWM_MAX_LINES 32
 #define PWM_MAX_LINE_LENGTH 80
 #define PWM_MAX_INPUT 80
 #define PWM_MAX_HISTORY 16
-#define PWM_WIDTH 80
-#define PWM_HEIGHT 24
-
-static uint16_t *vga_buffer = (uint16_t *)VGA_MEMORY;
 static int active_window;
 static int window_count;
 static int pwm_running;
 static int pwm_stop_requested;
+static int pwm_width;
+static int pwm_height;
 
 extern ext2_filesystem_t fs;
 extern command_t *find_command(const char *name);
@@ -40,13 +38,13 @@ static struct {
 } terminals[PWM_MAX_WINDOWS];
 
 static void window_geometry(int terminal, int *left, int *top, int *width, int *height) {
-    int half_width = PWM_WIDTH / 2;
-    int half_height = PWM_HEIGHT / 2;
-    if (window_count == 1) { *left = 0; *top = 0; *width = PWM_WIDTH; *height = PWM_HEIGHT; }
-    else if (window_count == 2) { *left = terminal * half_width; *top = 0; *width = half_width; *height = PWM_HEIGHT; }
-    else if (window_count == 3 && terminal == 0) { *left = 0; *top = 0; *width = half_width; *height = PWM_HEIGHT; }
-    else if (window_count == 3) { *left = half_width; *top = (terminal - 1) * half_height; *width = PWM_WIDTH - half_width; *height = terminal == 1 ? half_height : PWM_HEIGHT - half_height; }
-    else { *left = (terminal % 2) * half_width; *top = (terminal / 2) * half_height; *width = half_width; *height = terminal / 2 == 0 ? half_height : PWM_HEIGHT - half_height; }
+    int half_width = pwm_width / 2;
+    int half_height = pwm_height / 2;
+    if (window_count == 1) { *left = 0; *top = 0; *width = pwm_width; *height = pwm_height; }
+    else if (window_count == 2) { *left = terminal * half_width; *top = 0; *width = half_width; *height = pwm_height; }
+    else if (window_count == 3 && terminal == 0) { *left = 0; *top = 0; *width = half_width; *height = pwm_height; }
+    else if (window_count == 3) { *left = half_width; *top = (terminal - 1) * half_height; *width = pwm_width - half_width; *height = terminal == 1 ? half_height : pwm_height - half_height; }
+    else { *left = (terminal % 2) * half_width; *top = (terminal / 2) * half_height; *width = half_width; *height = terminal / 2 == 0 ? half_height : pwm_height - half_height; }
 }
 
 static void copy_text(char *destination, const char *source, int limit) {
@@ -147,8 +145,8 @@ static void save_history(int terminal) {
 }
 
 static void fill_screen(void) {
-    for (int row = 0; row < PWM_HEIGHT; row++) for (int column = 0; column < PWM_WIDTH; column++)
-        vga_buffer[row * PWM_WIDTH + column] = (0x07 << 8) | ' ';
+    for (int row = 0; row < pwm_height - 1; row++) for (int column = 0; column < pwm_width; column++)
+        video_put_cell(column, row, ' ', 0x07);
 }
 
 static void draw_window(int terminal, int left, int top, int width, int height) {
@@ -164,19 +162,19 @@ static void draw_window(int terminal, int left, int top, int width, int height) 
         if (column == 0 || column == width - 1) character = '|';
         if ((row == 0 || row == height - 1) && (column == 0 || column == width - 1)) character = '+';
         if (row == 1 && column > 0 && column < width - 1) color = title_color;
-        vga_buffer[(top + row) * PWM_WIDTH + left + column] = (color << 8) | character;
+        video_put_cell(left + column, top + row, character, color);
     }
     for (int index = 0; index < width - 2 && index < 13; index++) {
         char character = index == 0 ? (active_window == terminal ? '*' : ' ') :
                          (index == 1 ? ' ' : terminals[terminal].title[index - 2]);
-        vga_buffer[(top + 1) * PWM_WIDTH + left + index + 1] = (title_color << 8) | character;
+        video_put_cell(left + index + 1, top + 1, character, title_color);
     }
     for (int row = 0; row < content_height; row++) {
         int line_index = first_line + row;
         if (line_index < terminals[terminal].line_count) {
             int length = strlen(terminals[terminal].lines[line_index]);
             for (int column = 0; column < width - 2 && column < length; column++)
-                vga_buffer[(top + row + 2) * PWM_WIDTH + left + column + 1] = (0x07 << 8) | terminals[terminal].lines[line_index][column];
+                video_put_cell(left + column + 1, top + row + 2, terminals[terminal].lines[line_index][column], 0x07);
         }
     }
 }
@@ -185,33 +183,35 @@ static void draw_status(void) {
     const char *user = auth_current_username()[0] ? auth_current_username() : "piux";
     const char *text = " pWM | ";
     int column = 0;
-    for (int i = 0; text[i] && column < PWM_WIDTH; i++) vga_buffer[PWM_HEIGHT * PWM_WIDTH + column++] = (0x70 << 8) | text[i];
-    for (int i = 0; user[i] && column < PWM_WIDTH; i++) vga_buffer[PWM_HEIGHT * PWM_WIDTH + column++] = (0x70 << 8) | user[i];
+    for (int i = 0; text[i] && column < pwm_width; i++) video_put_cell(column++, pwm_height - 1, text[i], 0x70);
+    for (int i = 0; user[i] && column < pwm_width; i++) video_put_cell(column++, pwm_height - 1, user[i], 0x70);
     text = " | Ctrl+Q new | Ctrl+C close | Ctrl+Arrows focus";
-    for (int i = 0; text[i] && column < PWM_WIDTH; i++) vga_buffer[PWM_HEIGHT * PWM_WIDTH + column++] = (0x70 << 8) | text[i];
-    while (column < PWM_WIDTH) vga_buffer[PWM_HEIGHT * PWM_WIDTH + column++] = (0x70 << 8) | ' ';
+    for (int i = 0; text[i] && column < pwm_width; i++) video_put_cell(column++, pwm_height - 1, text[i], 0x70);
+    while (column < pwm_width) video_put_cell(column++, pwm_height - 1, ' ', 0x70);
 }
 
 static void draw_desktop(void) {
-    int left = PWM_WIDTH / 2;
-    int right = PWM_WIDTH - left;
-    int half = PWM_HEIGHT / 2;
+    int left = pwm_width / 2;
+    int right = pwm_width - left;
+    int half = pwm_height / 2;
+    int buffered = video_begin_frame();
     fill_screen();
-    if (window_count == 1) draw_window(0, 0, 0, PWM_WIDTH, PWM_HEIGHT);
+    if (window_count == 1) draw_window(0, 0, 0, pwm_width, pwm_height - 1);
     else if (window_count == 2) {
-        draw_window(0, 0, 0, left, PWM_HEIGHT);
-        draw_window(1, left, 0, right, PWM_HEIGHT);
+        draw_window(0, 0, 0, left, pwm_height - 1);
+        draw_window(1, left, 0, right, pwm_height - 1);
     } else if (window_count == 3) {
-        draw_window(0, 0, 0, left, PWM_HEIGHT);
+        draw_window(0, 0, 0, left, pwm_height - 1);
         draw_window(1, left, 0, right, half);
-        draw_window(2, left, half, right, PWM_HEIGHT - half);
+        draw_window(2, left, half, right, pwm_height - 1 - half);
     } else {
         draw_window(0, 0, 0, left, half);
         draw_window(1, left, 0, right, half);
-        draw_window(2, 0, half, left, PWM_HEIGHT - half);
-        draw_window(3, left, half, right, PWM_HEIGHT - half);
+        draw_window(2, 0, half, left, pwm_height - 1 - half);
+        draw_window(3, left, half, right, pwm_height - 1 - half);
     }
     draw_status();
+    if (buffered) video_present();
 }
 
 static int handle_mouse(const mouse_event_t *event) {
@@ -310,6 +310,8 @@ static void create_terminal(void) {
 int pwm_run(pwm_clear_t clear, pwm_puts_t puts, pwm_putc_t putc) {
     (void)clear; (void)puts; (void)putc;
     window_count = 0;
+    pwm_width = video_columns;
+    pwm_height = video_rows;
     active_window = 0;
     mouse_init();
     pwm_running = 1;

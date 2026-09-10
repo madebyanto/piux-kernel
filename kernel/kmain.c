@@ -3,19 +3,22 @@
 #include "keyboard.h"
 #include "ext2.h"
 #include "auth.h"
+#include "video.h"
+#include "system.h"
 #include "../bin/commands.h"
 #include "../tui/installer/installer.h"
 #include "../tui/wm/wm.h"
 
 #define VGA_MEMORY 0xB8000
-#define VGA_WIDTH 80
-#define VGA_HEIGHT 25
+#define VGA_WIDTH (video_framebuffer_ready ? VIDEO_COLUMNS : 80)
+#define VGA_HEIGHT (video_framebuffer_ready ? VIDEO_ROWS : 25)
 
 uint16_t *vga_buffer = (uint16_t *)VGA_MEMORY;
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 0;
 
 static void vga_update_cursor(void) {
+    if (video_framebuffer_ready) return;
     uint16_t position = (uint16_t)(cursor_y * VGA_WIDTH + cursor_x);
     outb(0x3D4, 0x0F);
     outb(0x3D5, position & 0xFF);
@@ -45,6 +48,10 @@ static void reboot_system(void) {
 }
 
 void vga_scroll(void) {
+    if (video_framebuffer_ready) {
+        video_scroll();
+        return;
+    }
     for (int i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++) {
         vga_buffer[i] = vga_buffer[i + VGA_WIDTH];
     }
@@ -72,8 +79,8 @@ void vga_putc(char c) {
             cursor_y--;
             cursor_x = VGA_WIDTH - 1;
         }
-        uint32_t index = cursor_y * VGA_WIDTH + cursor_x;
-        vga_buffer[index] = (0x07 << 8) | ' ';
+        if (video_framebuffer_ready) video_put_cell(cursor_x, cursor_y, ' ', 0x07);
+        else vga_buffer[cursor_y * VGA_WIDTH + cursor_x] = (0x07 << 8) | ' ';
         vga_update_cursor();
         return;
     }
@@ -93,8 +100,8 @@ void vga_putc(char c) {
         }
     }
     
-    uint32_t index = cursor_y * VGA_WIDTH + cursor_x;
-    vga_buffer[index] = (0x07 << 8) | (unsigned char)c;
+    if (video_framebuffer_ready) video_put_cell(cursor_x, cursor_y, c, 0x07);
+    else vga_buffer[cursor_y * VGA_WIDTH + cursor_x] = (0x07 << 8) | (unsigned char)c;
     cursor_x++;
     vga_update_cursor();
 }
@@ -106,6 +113,12 @@ void vga_puts(const char *str) {
 }
 
 void vga_clear(void) {
+    if (video_framebuffer_ready) {
+        video_clear();
+        cursor_x = 0;
+        cursor_y = 0;
+        return;
+    }
     for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
         vga_buffer[i] = (0x07 << 8) | ' ';
     }
@@ -121,8 +134,8 @@ void vga_backspace(void) {
         cursor_y--;
         cursor_x = VGA_WIDTH - 1;
     }
-    uint32_t index = cursor_y * VGA_WIDTH + cursor_x;
-    vga_buffer[index] = (0x07 << 8) | ' ';
+    if (video_framebuffer_ready) video_put_cell(cursor_x, cursor_y, ' ', 0x07);
+    else vga_buffer[cursor_y * VGA_WIDTH + cursor_x] = (0x07 << 8) | ' ';
     vga_update_cursor();
 }
 
@@ -371,8 +384,8 @@ void shell(void) {
 }
 
 void kernel_main(uint32_t magic, uint32_t addr) {
-    (void)magic;
-    (void)addr;
+    system_info_init(magic, addr);
+    video_init(magic, addr);
     vga_clear();
     vga_update_cursor();
 

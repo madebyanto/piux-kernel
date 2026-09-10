@@ -25,7 +25,7 @@ require_command make
 if [[ -n "${PIUX_QEMU_DISPLAY:-}" ]]; then
     QEMU_DISPLAY=("-display" "$PIUX_QEMU_DISPLAY")
 elif [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
-    QEMU_DISPLAY=("-display" "gtk")
+    QEMU_DISPLAY=("-display" "gtk,zoom-to-fit=off")
 else
     QEMU_DISPLAY=("-display" "curses")
 fi
@@ -49,7 +49,8 @@ start_vm() {
         -cdrom "$ISO" \
         -drive "file=$DISK,format=raw,if=ide" \
         -m 512M \
-        -vga std \
+        -vga none \
+        -device VGA,xres=640,yres=480 \
         "${QEMU_DISPLAY[@]}"
 }
 
